@@ -6,5 +6,11 @@ Parallel SSH utilities with support for Ansible-like inventory files.
 - pssh: execute commands
 
 TODO:
+- Documentation, examples
+- Flags
 - Work in progress: porting Paramiko/Python version to Go
-- pscp: parallal transfer
+- pscp: parallel transfer
+- ~/.ssh/config support
+- (Non-)inventory support
+    - Groups
+    - Assume host if name not in inventory and no glob char
