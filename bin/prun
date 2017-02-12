@@ -1,0 +1,198 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+
+from sys import stderr
+from argparse import ArgumentParser
+from threading import Thread, Lock
+from os import urandom
+from os.path import join, basename
+from base64 import b32encode
+from select import select
+from socket import timeout
+from fnmatch import fnmatch
+
+from paramiko import SSHClient, AutoAddPolicy
+
+
+def random_name():
+    return '._prun-' + b32encode(urandom(8)).decode().rstrip('=')
+
+
+def print_and_split(buf, printer, kind):
+    while True:
+        c = 0
+        while c < len(buf):
+            if buf[c] == b'\n':
+                break
+            elif buf[c] == b'\r':
+                # TODO: \r\n
+                break
+            c += 1
+        else:
+            break
+        printer(buf[:c], kind)
+        buf = buf[c + 1:]
+    return buf
+
+
+# TODO: this is terrible, but works.
+def exec_command(_print, con, command):
+    def _handle(buf, fd, chanbuf, kind, always=False):
+        if len(chanbuf):
+            try:
+                buf += fd.read(len(chanbuf))
+            except timeout:
+                pass
+        buf = print_and_split(buf, _print, kind)
+        if always:
+            if buf:
+                _print(buf.rstrip('\r\n'), kind)
+            return False
+        return buf
+
+    sin, sout, serr = con.exec_command(command, bufsize=-1)
+    sin.close()
+    assert sout.channel is serr.channel
+    chan = sout.channel
+    chan.settimeout(0.5)
+    bufout = b''
+    buferr = b''
+
+    while not chan.closed:
+        select([chan], [], [], 0.5)
+        if chan.recv_ready():
+            bufout = _handle(bufout, sout, chan.in_buffer, 'out')
+        if chan.recv_stderr_ready():
+            buferr = _handle(buferr, serr, chan.in_stderr_buffer, 'err')
+
+    _handle(bufout, sout, chan.in_buffer, 'out', True)
+    _handle(buferr, serr, chan.in_stderr_buffer, 'err', True)
+
+    if chan.exit_status_ready():
+        code = chan.recv_exit_status()
+        if code != 0:
+            print('Exited with code', code, file=stderr)
+    else:
+        print('Exited without code', file=stderr)
+
+protect = Lock()
+
+
+def run_script(props, path, args, user=None, verbose=False, env=False):
+    s = SSHClient()
+    s.load_system_host_keys()
+    s.set_missing_host_key_policy(AutoAddPolicy())
+    s.connect(props['host'], username=props['user'] or user)
+    host = props['name'].rjust(16)
+
+    # Transfer
+    ok = False
+    transfer = None
+    noexec = False
+    rf = None
+    mode = 'wbx'
+    if path.startswith('@'):
+        mode = 'wb'
+        transfer = s.open_sftp()
+        fp = open(args, 'rb')
+        path = path[1:]
+        noexec = True
+        #transfer.mkdir(dirname(path))
+    elif not path.startswith('='):
+        transfer = s.open_sftp()
+
+        fp = open(path, 'rb')
+        sname = basename(path)
+        rf = random_name()
+        transfer.mkdir(rf)
+        path = join(rf, sname)
+    else:
+        path = path[1:]
+
+    def _print(line, kind):
+        with protect:
+            if verbose:
+                print(host, kind, '|', repr(line))
+            else:
+                print(line)
+
+    try:
+        if transfer:
+            w = transfer.open(path, mode, bufsize=-1)
+            ok = True
+            while True:
+                buf = fp.read(4096)
+                if buf == b'':
+                    break
+                w.write(buf)
+            w.close()
+            transfer.chmod(path, 0o755)
+        if env:
+            cmd = 'env PRUN_HOST=' + host + ' ' + path
+        else:
+            cmd = path
+        if not noexec:
+            exec_command(_print, s, cmd + ' ' + args)
+    finally:
+        if transfer:
+            if rf:
+                if ok:
+                    transfer.remove(path)
+                transfer.rmdir(rf)
+            transfer.close()
+
+
+def parse_inv(fname):
+    hosts = []
+    for line in open(fname):
+        line = line.split()
+        props = {'host': line[0], 'name': line[0]}
+        for kv in line[1:]:
+            kv = kv.split('=', 1)
+            if kv[0] == 'ansible_ssh_host':
+                props['host'] = kv[1]
+            elif kv[0] == 'ansible_ssh_port':
+                props['port'] = kv[1]
+            elif kv[0] == 'ansible_ssh_user':
+                props['user'] = kv[1]
+        hosts.append(props)
+    return hosts
+
+
+def hosts_from_inventory(request, inv):
+    if request == 'all':
+        return inv
+    request = request.split(';')
+    return [h for h in inv
+            if any(fnmatch(h['name'], r) for r in request)]
+
+
+if __name__ == '__main__':
+    parser = ArgumentParser(description='Execute SSH commands in parallel')
+    parser.add_argument('-i', '--inventory', default='inv',
+                        help='Ansible inventory (basic support)')
+    parser.add_argument('-u', '--user', help='Username')
+    parser.add_argument('-q', '--quiet', action='store_true', help='Quiet')
+    parser.add_argument('-e', '--env', action='store_true',
+                        help='Add PRUN_HOST env')
+    parser.add_argument('hosts')
+    parser.add_argument('command', nargs='+', help='Command to execute')
+
+    opts = parser.parse_args()
+    if not opts.command:
+        parser.print_help()
+        exit(1)
+
+    inventory = parse_inv(opts.inventory)
+    hosts = hosts_from_inventory(opts.hosts, inventory)
+    threads = []
+    for host in hosts:
+        t = Thread(target=run_script, args=(host, opts.command[0],
+                                            ' '.join(opts.command[1:]),
+                                            opts.user,
+                                            not opts.quiet, opts.env))
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
