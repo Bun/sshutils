@@ -4,12 +4,13 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"errors"
-	"github.com/Bun/sshutils"
 	"github.com/pkg/sftp"
 	"io"
 	"os"
 	"path"
 	"strings"
+
+	"awoo.nl/sshutils"
 )
 
 func randomName() string {

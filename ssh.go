@@ -37,15 +37,13 @@ func (c *Client) Run(cmd string) error {
 }
 
 func (c *Client) Output() {
-	fmt.Printf("%s |\n", c.Name)
-
 	o := strings.TrimRight(c.Stdout.String(), " \t\r\n")
 	if o != "" {
-		fmt.Printf("O: %s\n", o)
+		fmt.Printf("%s: %s\n", c.Name, o)
 	}
 	o = strings.TrimRight(c.Stderr.String(), " \t\r\n")
 	if o != "" {
-		fmt.Printf("E: %s\n", o)
+		fmt.Printf("%s! %s\n", c.Name, o)
 	}
 }
 
@@ -84,7 +82,8 @@ func Run(h InventoryHost, rf RunFunc, args []string) WaitChan {
 		}
 		c, err := ssh.Dial("tcp", host, cfg)
 		if err != nil {
-			panic(err)
+			fmt.Println(h.Name, "failed:", err)
+			return
 		}
 		defer c.Close()
 		err = rf(&Client{Client: c, Name: h.Name}, host, args)

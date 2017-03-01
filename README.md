@@ -6,6 +6,7 @@ Parallel SSH utilities with support for Ansible-like inventory files.
 - pssh: execute commands
 
 TODO:
+- Semi-realtime output
 - Documentation, examples
 - Flags
 - Work in progress: porting Paramiko/Python version to Go

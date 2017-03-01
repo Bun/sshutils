@@ -2,45 +2,20 @@ package sshutils
 
 import (
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 
 	"io/ioutil"
+	"net"
 	"os"
 	"os/user"
 	"strings"
 )
 
-func loadKey(fn string) (ssh.Signer, error) {
-	key, err := ioutil.ReadFile(fn)
-	if err != nil {
-		return nil, err
+func loadAgent() {
+	if a, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
+		am := ssh.PublicKeysCallback(agent.NewClient(a).Signers)
+		auths = append(auths, am)
 	}
-
-	return ssh.ParsePrivateKey(key)
-}
-
-// TODO
-func loadKeys() {
-	u, _ := user.Current()
-	// XXX
-	defaultUser = u.Username
-	d := u.HomeDir + "/.ssh/"
-	fis, err := ioutil.ReadDir(d)
-	if err != nil {
-		panic(err)
-	}
-	for _, fi := range fis {
-		fn := fi.Name()
-		if !strings.HasSuffix(fn, ".pub") {
-			if s, err := loadKey(d + fn); err == nil {
-				auths = append(auths, ssh.PublicKeys(s))
-			}
-		}
-	}
-}
-
-func match(name, wc string) bool {
-	// TODO
-	return name == wc
 }
 
 func filteredInventory(all []InventoryHost, hosts string) []InventoryHost {
@@ -67,8 +42,13 @@ func filteredInventory(all []InventoryHost, hosts string) []InventoryHost {
 	return inv
 }
 
+// TODO: -i inv
+// TODO: -u user
 func ParseFlags() ([]InventoryHost, []string) {
-	loadKeys()
+	loadAgent()
+
+	u, _ := user.Current()
+	defaultUser = u.Username
 
 	b, err := ioutil.ReadFile("inv")
 	if err != nil {
