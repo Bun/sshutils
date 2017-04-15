@@ -16,9 +16,10 @@ func run(c *sshutils.Client, h string, args []string) error {
 func main() {
 	var ws []sshutils.WaitChan
 	hosts, args := sshutils.ParseFlags()
+	kh := sshutils.LoadKnownHosts()
 
 	for _, h := range hosts {
-		ws = append(ws, sshutils.Run(h, run, args))
+		ws = append(ws, sshutils.Run(h, kh, run, args))
 	}
 
 	sshutils.WaitAll(ws)

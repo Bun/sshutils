@@ -58,7 +58,7 @@ var (
 	}
 )
 
-func Run(h InventoryHost, rf RunFunc, args []string) WaitChan {
+func Run(h InventoryHost, kh KnownHosts, rf RunFunc, args []string) WaitChan {
 	c := make(WaitChan, 1)
 	go func() {
 		defer close(c)
@@ -79,6 +79,7 @@ func Run(h InventoryHost, rf RunFunc, args []string) WaitChan {
 			User:              u,
 			Auth:              auths,
 			HostKeyAlgorithms: hka,
+			HostKeyCallback:   kh.VerifyKey,
 		}
 		c, err := ssh.Dial("tcp", host, cfg)
 		if err != nil {
