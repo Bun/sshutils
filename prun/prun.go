@@ -1,86 +1,45 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/base32"
-	"errors"
-	"github.com/pkg/sftp"
-	"io"
-	"os"
 	"path"
 	"strings"
 
 	"awoo.nl/sshutils"
 )
 
-func randomName() string {
-	var b [12]byte
-	if _, err := rand.Read(b[:]); err == nil {
-		return base32.StdEncoding.EncodeToString(b[:])
-	}
-	return ""
+type Run struct {
+	rpath, rfn string
 }
 
-// TODO: audit
-// TODO: test error handling
-// TODO: resource leakage
-func run(c *sshutils.Client, h string, args []string) error {
-	s, err := sftp.NewClient(c.Client)
-	if err != nil {
-		return err
-	}
-	defer s.Close()
-
-	// Create temporary execution dir
-	rn := randomName()
-	if rn == "" {
-		return errors.New("Failed to generate random path name")
-	}
-	// TODO: variable path
-	base := ".cache"
-	s.Mkdir(base)
-	rpath := base + "/prun-" + rn
-	// If path already exists, something is really wrong
-	if err := s.Mkdir(rpath); err != nil {
-		return err
-	}
-
-	// Transfer file
+func (r *Run) Prepare(c *sshutils.Client, h string, args []string) (string, error) {
+	var err error
 	fn := args[0]
-	l, err := os.Open(fn)
+	r.rpath, err = c.TempPath(".cache", "prun-")
 	if err != nil {
-		return err
+		return "", err
 	}
-
-	b := path.Base(fn)
-	rfn := rpath + "/" + b
-	if r, err := s.Create(rfn); err != nil {
-		return err
-	} else {
-		_, err := io.Copy(r, l)
-		if err != nil {
-			return err
-		}
-		r.Close()
+	r.rfn = path.Join(r.rpath, path.Base(fn))
+	if err := c.TransferFile(fn, r.rfn); err != nil {
+		return "", err
 	}
-	l.Close()
-	if err := s.Chmod(rfn, 0755); err != nil {
-		return err
+	if err := c.SFTP.Chmod(r.rfn, 0755); err != nil {
+		return "", err
 	}
 
 	// TODO: escape rfn!
-	cmd := rfn
+	cmd := r.rfn
 	if len(args) > 1 {
 		cmd += " " + strings.Join(args[1:], " ")
 	}
-	err = c.Run(cmd)
-	c.Output()
+	return cmd, nil
+}
 
-	// Erase temporary paths
-	s.Remove(rfn)
-	s.RemoveDirectory(rpath)
-
-	return err
+func (r *Run) Clean(c *sshutils.Client, h string) error {
+	if c.SFTP != nil {
+		c.SFTP.Remove(r.rfn)
+		c.SFTP.RemoveDirectory(r.rpath)
+	}
+	return nil
 }
 
 func main() {
@@ -89,7 +48,7 @@ func main() {
 	kh := sshutils.LoadKnownHosts()
 
 	for _, h := range hosts {
-		ws = append(ws, sshutils.Run(h, kh, run, args))
+		ws = append(ws, sshutils.Run(h, kh, &Run{}, args))
 	}
 
 	sshutils.WaitAll(ws)

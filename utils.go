@@ -80,7 +80,6 @@ func (kh KnownHosts) Parse(s string) {
 		}
 		pk := parts[1] + " " + parts[2]
 		for _, host := range strings.Split(parts[0], ",") {
-			log.Printf("%s => %s", host, fixHost(host))
 			kh[fixHost(host)] = pk
 		}
 	}

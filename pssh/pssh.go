@@ -6,20 +6,24 @@ import (
 	"strings"
 )
 
-func run(c *sshutils.Client, h string, args []string) error {
-	err := c.Run(strings.Join(args, " "))
-	c.Output()
-	return err
+type Run struct{}
+
+func (_ *Run) Prepare(c *sshutils.Client, h string, args []string) (string, error) {
+	// HEADSUP: Commands are expected to be escaped by the user if necessary
+	return strings.Join(args, " "), nil
 }
 
-// HEADSUP: Commands are expected to be escaped by the user if necessary
+func (_ *Run) Clean(c *sshutils.Client, h string) error {
+	return nil
+}
+
 func main() {
 	var ws []sshutils.WaitChan
 	hosts, args := sshutils.ParseFlags()
 	kh := sshutils.LoadKnownHosts()
 
 	for _, h := range hosts {
-		ws = append(ws, sshutils.Run(h, kh, run, args))
+		ws = append(ws, sshutils.Run(h, kh, &Run{}, args))
 	}
 
 	sshutils.WaitAll(ws)
