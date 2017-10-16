@@ -4,18 +4,33 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 
+	"flag"
+	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"os/user"
 	"strings"
 )
 
-func loadAgent() {
-	if a, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK")); err == nil {
-		am := ssh.PublicKeysCallback(agent.NewClient(a).Signers)
-		auths = append(auths, am)
+func loadAgent(keysOptional bool) error {
+	a, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+	if err != nil {
+		return err
 	}
+	agent := agent.NewClient(a)
+	keys, err := agent.List()
+	if err != nil {
+		return err
+	} else if !keysOptional && len(keys) == 0 {
+		// Could be some edge case where this isn't an issue
+		return fmt.Errorf("Agent has no keys loaded")
+	}
+
+	am := ssh.PublicKeysCallback(agent.Signers)
+	auths = append(auths, am)
+	return nil
 }
 
 func filteredInventory(all []InventoryHost, hosts string) []InventoryHost {
@@ -42,29 +57,36 @@ func filteredInventory(all []InventoryHost, hosts string) []InventoryHost {
 	return inv
 }
 
-// TODO: -i inv
-// TODO: -u user
+var (
+	flagNokey = flag.Bool("nk", false, "Keys are not required")
+	flagInv   = flag.String("i", "inv", "Inventory filename")
+	flagUser  = flag.String("u", "", "Default username")
+)
+
 func ParseFlags() ([]InventoryHost, []string) {
-	loadAgent()
+	flag.Parse()
+	args := flag.Args()
+	if len(args) < 2 {
+		log.Fatalln("Usage: X host-selector command [args]")
+	}
 
-	u, _ := user.Current()
-	defaultUser = u.Username
+	if err := loadAgent(*flagNokey); err != nil {
+		log.Fatalln("ssh-agent error:", err)
+	}
 
-	b, err := ioutil.ReadFile("inv")
+	if *flagUser != "" {
+		defaultUser = *flagUser
+	} else {
+		u, _ := user.Current()
+		defaultUser = u.Username
+	}
+
+	b, err := ioutil.ReadFile(*flagInv)
 	if err != nil {
-		panic(err)
+		log.Fatal("Error reading ", *flagInv, ": ", err)
 	}
 
-	inv := parseInventory(b)
-	if len(os.Args) > 1 {
-		// Extract relevant hosts
-		inv = filteredInventory(inv, os.Args[1])
-	}
-
-	var args []string
-	if len(os.Args) > 2 {
-		args = os.Args[2:]
-	}
-
-	return inv, args
+	// Extract relevant hosts
+	i := filteredInventory(parseInventory(b), args[0])
+	return i, args[1:]
 }

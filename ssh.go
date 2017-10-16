@@ -5,7 +5,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"bytes"
-	"fmt"
+	"log"
 	"os"
 	"sync"
 )
@@ -45,7 +45,9 @@ func (p *RealTimePrinter) Write(b []byte) (int, error) {
 
 func (p *RealTimePrinter) End() {
 	// Flush last bytes if data didn't end with a new-line
-	p.Write([]byte{'\n'})
+	if len(p.buf) > 0 {
+		p.Write([]byte{'\n'})
+	}
 }
 
 type Client struct {
@@ -77,7 +79,7 @@ func (c *Client) Run(cmd string) error {
 		// This has the side-effect of killing the process if the user
 		// disconnects; add flag?
 		if err := s.RequestPty("xterm", 80, 40, ptyModes); err != nil {
-			fmt.Println(c.Name, "request-pty error:", err)
+			log.Println(c.Name, "request-pty error:", err)
 		}
 		r := &RealTimePrinter{[]byte(c.Name + "> "), nil}
 		defer r.End()
@@ -92,28 +94,9 @@ func (c *Client) Run(cmd string) error {
 var (
 	auths       []ssh.AuthMethod
 	defaultUser string
-	hka         = []string{
-		ssh.KeyAlgoRSA,
-		ssh.KeyAlgoED25519,
-		ssh.KeyAlgoECDSA384,
-		ssh.KeyAlgoECDSA256,
-	}
 )
 
-func (h InventoryHost) dialer() string {
-	host := h.Host
-	if host == "" {
-		host = h.Name
-	}
-	if h.Port != "" {
-		host += ":" + h.Port
-	} else {
-		host += ":22"
-	}
-	return host
-}
-
-func Run(h InventoryHost, kh KnownHosts, r Runner, args []string) WaitChan {
+func Run(h InventoryHost, kh *KnownHosts, r Runner, args []string) WaitChan {
 	c := make(WaitChan, 1)
 	go func() {
 		defer close(c)
@@ -121,16 +104,18 @@ func Run(h InventoryHost, kh KnownHosts, r Runner, args []string) WaitChan {
 		if u == "" {
 			u = defaultUser
 		}
+		hka := kh.GetHKA(h.canonical())
 		cfg := &ssh.ClientConfig{
 			User:              u,
 			Auth:              auths,
 			HostKeyAlgorithms: hka,
 			HostKeyCallback:   kh.VerifyKey,
 		}
+		//log.Println("HKA for", h.canonical(), "=", cfg.HostKeyAlgorithms)
 		host := h.dialer()
 		c, err := ssh.Dial("tcp", host, cfg)
 		if err != nil {
-			fmt.Println(h.Name, "failed:", err)
+			log.Println(h.Name, "failed:", err)
 			return
 		}
 		defer c.Close()
@@ -139,11 +124,11 @@ func Run(h InventoryHost, kh KnownHosts, r Runner, args []string) WaitChan {
 		defer r.Clean(cli, host)
 		cmd, err := r.Prepare(cli, host, args)
 		if err != nil {
-			fmt.Println(h.Name, "failed:", err)
+			log.Println(h.Name, "failed:", err)
 		}
 
 		if err := cli.Run(cmd); err != nil {
-			fmt.Println(h.Name, "failed:", err)
+			log.Println(h.Name, "failed:", err)
 		}
 	}()
 	return c

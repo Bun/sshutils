@@ -5,10 +5,14 @@ Parallel SSH utilities with support for Ansible-like inventory files.
 - prun: execute local scripts/binaries remotely
 - pssh: execute commands
 
-TODO:
-- Semi-realtime output
+Requirements:
+- A running ssh-agent with the proper keys loaded
+- The public key of the server is in ``~/.ssh/known_hosts``
+
+
+## TODO
+
 - Documentation, examples
-- Flags
 - Work in progress: porting Paramiko/Python version to Go
 - pscp: parallel transfer
 - ~/.ssh/config support

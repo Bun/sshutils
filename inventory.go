@@ -11,6 +11,35 @@ type (
 	}
 )
 
+// For comparing hostnames
+func (h InventoryHost) canonical() string {
+	host := h.Host
+	if host == "" {
+		host = h.Name
+	}
+	if h.Port != "" && h.Port != "22" {
+		return "[" + host + "]:" + h.Port
+	}
+	if strings.Index(host, ":") >= 0 {
+		return "[" + host + "]"
+	}
+	return host
+}
+
+// For dialing
+func (h InventoryHost) dialer() string {
+	host := h.Host
+	if host == "" {
+		host = h.Name
+	}
+	if h.Port != "" {
+		host += ":" + h.Port
+	} else {
+		host += ":22"
+	}
+	return host
+}
+
 func prefix(v, s string) (string, bool) {
 	if strings.HasPrefix(v, s) {
 		return v[len(s):], true
