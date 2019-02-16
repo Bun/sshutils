@@ -51,17 +51,24 @@ func prefix(v, s string) (string, bool) {
 func parseInventory(buf []byte) (inv []InventoryHost) {
 	lines := strings.Split(string(buf), "\n")
 	for _, line := range lines {
-		parts := strings.Split(line, " ")
-		if parts[0] == "" {
+		if c := strings.Index(line, "#"); c >= 0 {
+			line = line[:c]
+		}
+		if strings.Trim(line, " \t") == "" {
 			continue
 		}
+		parts := strings.Split(line, " ")
 		h := InventoryHost{Name: parts[0]}
 		for _, p := range parts[1:] {
-			if v, ok := prefix(p, "ansible_ssh_host="); ok {
+			if v, ok := prefix(p, "ansible_host="); ok {
+				h.Host = v
+			} else if v, ok := prefix(p, "ansible_ssh_host="); ok {
 				h.Host = v
 			} else if v, ok := prefix(p, "ansible_ssh_port="); ok {
 				h.Port = v
 			} else if v, ok := prefix(p, "ansible_ssh_user="); ok {
+				h.User = v
+			} else if v, ok := prefix(p, "ansible_user="); ok {
 				h.User = v
 			}
 		}

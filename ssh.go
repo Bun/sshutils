@@ -1,13 +1,13 @@
 package sshutils
 
 import (
-	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
-
 	"bytes"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
 )
 
 var lock sync.Mutex

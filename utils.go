@@ -1,12 +1,12 @@
 package sshutils
 
 import (
-	"golang.org/x/crypto/ssh"
-
 	"encoding/base64"
 	"log"
 	"regexp"
 	"strings"
+
+	"golang.org/x/crypto/ssh"
 )
 
 var wildcardExpr = strings.NewReplacer(

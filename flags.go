@@ -1,9 +1,6 @@
 package sshutils
 
 import (
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
-
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -12,6 +9,9 @@ import (
 	"os"
 	"os/user"
 	"strings"
+
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 func loadAgent(keysOptional bool) error {

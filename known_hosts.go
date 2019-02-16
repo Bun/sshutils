@@ -3,8 +3,6 @@ package sshutils
 // TODO: optimize some lookups based on hostname
 
 import (
-	"golang.org/x/crypto/ssh"
-
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
@@ -14,6 +12,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"golang.org/x/crypto/ssh"
 )
 
 type KnownHostEntry struct {
@@ -75,7 +75,7 @@ func (kh *KnownHosts) VerifyKey(hostname string, remote net.Addr, key ssh.Public
 	if len(seen) > 0 {
 		return fmt.Errorf("%s: Offered %s, know only %s", hostname, offered, seen)
 	}
-	return fmt.Errorf("%s: Unknown hostname", hostname)
+	return fmt.Errorf("%s: Hostname not in known_hosts", hostname)
 }
 
 // TODO: prefer order
@@ -106,16 +106,19 @@ func PlainHostsEntry(cached, name string) bool {
 // HMAC-SHA1: |1|salt|digest|
 // TODO: check how OpenSSH deals with collisions
 func HashedHMACSHA1Entry(e, name string) bool {
-	parts := strings.Split("|", e)
-	if len(parts) != 4 || parts[0] != "" || parts[1] != "1" {
+	parts := strings.Split(e, "|")
+	if len(parts) < 4 || parts[0] != "" || parts[1] != "1" {
+		fmt.Printf("invalid entry %q\n", parts)
 		return false
 	}
 	salt, err := base64.StdEncoding.DecodeString(parts[2])
 	if err != nil {
+		println("invalid salt")
 		return false
 	}
 	actual, err := base64.StdEncoding.DecodeString(parts[3])
 	if err != nil {
+		println("invalid digest")
 		return false
 	}
 	h := hmac.New(sha1.New, salt)
