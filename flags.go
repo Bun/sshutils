@@ -33,15 +33,17 @@ func loadAgent(keysOptional bool) error {
 	return nil
 }
 
-func filteredInventory(all []InventoryHost, hosts string) []InventoryHost {
+func filteredInventory(all Inventory, hosts string) []Target {
 	if hosts == "all" || hosts == "*" {
-		return all
+		return all.Targets
 	}
 
-	var inv []InventoryHost
+	// TODO: support groups
+
+	var inv []Target
 	wcs := wildcards(strings.Split(hosts, ";"))
 
-	for _, h := range all {
+	for _, h := range all.Targets {
 		m := false
 		for _, wc := range wcs {
 			if wc.MatchString(h.Name) {
@@ -59,11 +61,11 @@ func filteredInventory(all []InventoryHost, hosts string) []InventoryHost {
 
 var (
 	flagNokey = flag.Bool("nk", false, "Keys are not required")
-	flagInv   = flag.String("i", "inv", "Inventory filename")
+	flagInv   = flag.String("i", "hosts.yaml", "Inventory filename")
 	flagUser  = flag.String("u", "", "Default username")
 )
 
-func ParseFlags() ([]InventoryHost, []string) {
+func ParseFlags() ([]Target, []string) {
 	flag.Parse()
 	args := flag.Args()
 	if len(args) < 2 {
@@ -81,12 +83,24 @@ func ParseFlags() ([]InventoryHost, []string) {
 		defaultUser = u.Username
 	}
 
-	b, err := ioutil.ReadFile(*flagInv)
+	i, err := inv(*flagInv)
+	if err != nil {
+		log.Fatalln("Inventory:", err)
+	}
+
+	return filteredInventory(i, args[0]), args[1:]
+}
+
+func inv(fname string) (Inventory, error) {
+	b, err := ioutil.ReadFile(fname)
 	if err != nil {
 		log.Fatal("Error reading ", *flagInv, ": ", err)
 	}
 
+	if strings.HasSuffix(fname, ".yaml") || strings.HasSuffix(fname, ".yml") {
+		return yamlInv(b)
+	}
+
 	// Extract relevant hosts
-	i := filteredInventory(parseInventory(b), args[0])
-	return i, args[1:]
+	return parseInventory(b)
 }

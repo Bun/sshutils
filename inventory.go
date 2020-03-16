@@ -2,17 +2,20 @@ package sshutils
 
 import "strings"
 
-type (
-	InventoryHost struct {
-		Name string
-		Host string
-		Port string
-		User string
-	}
-)
+type Inventory struct {
+	Targets []Target
+	Groups  map[string][]string
+}
+
+type Target struct {
+	Name string
+	Host string
+	Port string
+	User string
+}
 
 // For comparing hostnames
-func (h InventoryHost) canonical() string {
+func (h Target) canonical() string {
 	host := h.Host
 	if host == "" {
 		host = h.Name
@@ -27,7 +30,7 @@ func (h InventoryHost) canonical() string {
 }
 
 // For dialing
-func (h InventoryHost) dialer() string {
+func (h Target) dialer() string {
 	host := h.Host
 	if host == "" {
 		host = h.Name
@@ -48,7 +51,8 @@ func prefix(v, s string) (string, bool) {
 }
 
 // TODO: support groups
-func parseInventory(buf []byte) (inv []InventoryHost) {
+func parseInventory(buf []byte) (Inventory, error) {
+	var inv []Target
 	lines := strings.Split(string(buf), "\n")
 	for _, line := range lines {
 		if c := strings.Index(line, "#"); c >= 0 {
@@ -58,7 +62,7 @@ func parseInventory(buf []byte) (inv []InventoryHost) {
 			continue
 		}
 		parts := strings.Split(line, " ")
-		h := InventoryHost{Name: parts[0]}
+		h := Target{Name: parts[0]}
 		for _, p := range parts[1:] {
 			if v, ok := prefix(p, "ansible_host="); ok {
 				h.Host = v
@@ -74,5 +78,5 @@ func parseInventory(buf []byte) (inv []InventoryHost) {
 		}
 		inv = append(inv, h)
 	}
-	return inv
+	return Inventory{Targets: inv}, nil
 }

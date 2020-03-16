@@ -18,7 +18,6 @@ var ptyModes = ssh.TerminalModes{
 	ssh.TTY_OP_OSPEED: 14400,
 }
 
-// TODO: this will eat the last line if incomplete
 type RealTimePrinter struct {
 	prefix []byte
 	buf    []byte
@@ -96,7 +95,7 @@ var (
 	defaultUser string
 )
 
-func Run(h InventoryHost, kh *KnownHosts, r Runner, args []string) WaitChan {
+func Run(h Target, kh *KnownHosts, r Runner, args []string) WaitChan {
 	c := make(WaitChan, 1)
 	go func() {
 		defer close(c)
