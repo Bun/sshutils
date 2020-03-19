@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
@@ -16,14 +17,14 @@ func (r *Run) Prepare(c *sshutils.Client, h string, args []string) (string, erro
 	fn := args[0]
 	r.rpath, err = c.TempPath(".cache", "prun-")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("temp path: %w", err)
 	}
 	r.rfn = path.Join(r.rpath, path.Base(fn))
 	if err := c.TransferFile(fn, r.rfn); err != nil {
-		return "", err
+		return "", fmt.Errorf("transfer %v => %v: %w", fn, r.rfn, err)
 	}
 	if err := c.SFTP.Chmod(r.rfn, 0755); err != nil {
-		return "", err
+		return "", fmt.Errorf("chmod %v: %w", r.rfn, err)
 	}
 
 	// TODO: escape rfn!

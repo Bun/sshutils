@@ -2,6 +2,7 @@ package sshutils
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -114,7 +115,7 @@ func Run(h Target, kh *KnownHosts, r Runner, args []string) WaitChan {
 		host := h.dialer()
 		c, err := ssh.Dial("tcp", host, cfg)
 		if err != nil {
-			log.Println(h.Name, "failed:", err)
+			log.Println(h.Name, "failed:", fmt.Errorf("Dialing %v: %w", host, err))
 			return
 		}
 		defer c.Close()

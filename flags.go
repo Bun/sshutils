@@ -60,16 +60,22 @@ func filteredInventory(all Inventory, hosts string) []Target {
 }
 
 var (
-	flagNokey = flag.Bool("nk", false, "Keys are not required")
+	flagNokey = flag.Bool("nk", false, "Run even if no keys are loaded in agent")
 	flagInv   = flag.String("i", "hosts.yaml", "Inventory filename")
 	flagUser  = flag.String("u", "", "Default username")
 )
 
 func ParseFlags() ([]Target, []string) {
+	flag.Usage = func() {
+		fmt.Fprintln(flag.CommandLine.Output(), "Usage:", os.Args[0], "[flags] <host-pattern> <command>")
+		fmt.Fprintln(flag.CommandLine.Output(), "Flags:")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	args := flag.Args()
 	if len(args) < 2 {
-		log.Fatalln("Usage: X host-selector command [args]")
+		flag.Usage()
+		os.Exit(1)
 	}
 
 	if err := loadAgent(*flagNokey); err != nil {

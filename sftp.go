@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -27,7 +28,7 @@ func (c *Client) getSFTP() (*sftp.Client, error) {
 	}
 	s, err := sftp.NewClient(c.Client)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("SFTP client: %w", err)
 	}
 	c.SFTP = s
 	return s, nil
