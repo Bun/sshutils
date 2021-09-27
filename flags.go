@@ -3,7 +3,6 @@ package sshutils
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -83,30 +82,15 @@ func ParseFlags() ([]Target, []string) {
 	}
 
 	if *flagUser != "" {
-		defaultUser = *flagUser
-	} else {
-		u, _ := user.Current()
-		defaultUser = u.Username
+		forceUser = *flagUser
 	}
+	u, _ := user.Current()
+	defaultUser = u.Username
 
-	i, err := inv(*flagInv)
+	inv, err := parseInventory(*flagInv)
 	if err != nil {
 		log.Fatalln("Inventory:", err)
 	}
 
-	return filteredInventory(i, args[0]), args[1:]
-}
-
-func inv(fname string) (Inventory, error) {
-	b, err := ioutil.ReadFile(fname)
-	if err != nil {
-		log.Fatal("Error reading ", *flagInv, ": ", err)
-	}
-
-	if strings.HasSuffix(fname, ".yaml") || strings.HasSuffix(fname, ".yml") {
-		return yamlInv(b)
-	}
-
-	// Extract relevant hosts
-	return parseInventory(b)
+	return filteredInventory(inv, args[0]), args[1:]
 }

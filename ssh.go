@@ -94,6 +94,7 @@ func (c *Client) Run(cmd string) error {
 var (
 	auths       []ssh.AuthMethod
 	defaultUser string
+	forceUser   string
 )
 
 func Run(h Target, kh *KnownHosts, r Runner, args []string) WaitChan {
@@ -101,6 +102,9 @@ func Run(h Target, kh *KnownHosts, r Runner, args []string) WaitChan {
 	go func() {
 		defer close(c)
 		u := h.User
+		if forceUser != "" {
+			u = forceUser
+		}
 		if u == "" {
 			u = defaultUser
 		}

@@ -1,6 +1,11 @@
 package sshutils
 
-import "strings"
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+)
 
 type Inventory struct {
 	Targets []Target
@@ -50,11 +55,35 @@ func prefix(v, s string) (string, bool) {
 	return "", false
 }
 
+func parseInventory(name string) (Inventory, error) {
+	if strings.HasSuffix(name, ".yaml") {
+		return parseInventoryYaml(name)
+	}
+	info, rerr := os.Stat(name)
+	if rerr == nil && !info.IsDir() {
+		return parseInventoryINI(name)
+	}
+	hy := filepath.Join(name, "hosts.yaml")
+	if inv, err := parseInventoryYaml(hy); err == nil || !os.IsNotExist(err) {
+		return inv, err
+	}
+	hi := filepath.Join(name, "hosts")
+	if inv, err := parseInventoryINI(hi); err == nil || !os.IsNotExist(err) {
+		return inv, err
+	}
+	return Inventory{}, rerr
+}
+
 // TODO: support groups
-func parseInventory(buf []byte) (Inventory, error) {
-	var inv []Target
-	lines := strings.Split(string(buf), "\n")
-	for _, line := range lines {
+func parseInventoryINI(fname string) (inv Inventory, err error) {
+	buf, err := os.ReadFile(fname)
+	if err != nil {
+		return
+	}
+	// TODO: support groups
+	lines := bytes.Split(buf, []byte("\n"))
+	for _, bline := range lines {
+		line := string(bline)
 		if c := strings.Index(line, "#"); c >= 0 {
 			line = line[:c]
 		}
@@ -76,7 +105,7 @@ func parseInventory(buf []byte) (Inventory, error) {
 				h.User = v
 			}
 		}
-		inv = append(inv, h)
+		inv.Targets = append(inv.Targets, h)
 	}
-	return Inventory{Targets: inv}, nil
+	return
 }
