@@ -5,10 +5,17 @@ Parallel SSH utilities with support for Ansible-like inventory files.
 - pssh: execute commands
 - prun: execute local scripts/binaries remotely (requires SFTP support)
 
+
 Requirements:
 
 - A running ssh-agent with the proper keys loaded
 - The public key of the server is in `~/.ssh/known_hosts`
+
+
+Features:
+
+- Loads hostname aliases from `~/.ssh/config`
+- Basic support for groups in YAML-inventories
 
 
 ## Examples
@@ -32,15 +39,14 @@ Run a local script (or binary) remotely:
 
 - Additional documentation
 - pscp: parallel transfer
-- Load hostnames from `~/.ssh/config`
-- (Non-)inventory support
-    - Groups
-    - Assume hostname if name not in inventory and no glob char
+- Group support in INI-based inventories
+- Support group-trees (groups of groups)
 
 
 ## Ansible inventories
 
-Ansible YAML-based configurations are supported, for example:
+Ansible INI-based and YAML-based configurations are supported to some degree,
+for example:
 
     all:
       hosts:
@@ -53,6 +59,6 @@ Ansible YAML-based configurations are supported, for example:
 
 Supported variables:
 
-- `ansible_host`
-- `ansible_port`
+- `ansible_host` / `ansible_ssh_host`
+- `ansible_port` / `ansible_ssh_port`
 - `ansible_user`
