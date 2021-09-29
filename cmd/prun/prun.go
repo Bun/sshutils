@@ -47,8 +47,12 @@ func main() {
 	var ws []sshutils.WaitChan
 	hosts, args := sshutils.ParseFlags()
 	kh := sshutils.LoadKnownHosts()
+	sc := sshutils.LoadSSHConfig()
 
 	for _, h := range hosts {
+		if h.Host == "" {
+			h.Host = sc.HostAlias[h.Name]
+		}
 		ws = append(ws, sshutils.Run(h, kh, &Run{}, args))
 	}
 

@@ -37,20 +37,20 @@ func filteredInventory(all Inventory, hosts string) []Target {
 		return all.Targets
 	}
 
-	// TODO: support groups
+	// TODO: support group trees
 
-	var inv []Target
+	desired := map[string]bool{}
 	wcs := wildcards(strings.Split(hosts, ";"))
-
-	for _, h := range all.Targets {
-		m := false
-		for _, wc := range wcs {
-			if wc.MatchString(h.Name) {
-				m = true
-				break
+	for name, group := range all.Groups {
+		if wcs.Matches(name) {
+			for _, host := range group {
+				desired[host] = true
 			}
 		}
-		if m {
+	}
+	var inv []Target
+	for _, h := range all.Targets {
+		if desired[h.Name] || wcs.Matches(h.Name) {
 			inv = append(inv, h)
 		}
 	}

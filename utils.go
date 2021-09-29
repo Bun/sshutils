@@ -14,8 +14,19 @@ var wildcardExpr = strings.NewReplacer(
 	"\\?", ".?",
 )
 
+type wcMatch []*regexp.Regexp
+
+func (wcs wcMatch) Matches(s string) bool {
+	for _, wc := range wcs {
+		if wc.MatchString(s) {
+			return true
+		}
+	}
+	return false
+}
+
 // TODO: error reporting
-func wildcards(wcs []string) (rs []*regexp.Regexp) {
+func wildcards(wcs []string) (rs wcMatch) {
 	for _, wc := range wcs {
 		wc := wildcardExpr.Replace(regexp.QuoteMeta(wc))
 		if r, err := regexp.Compile("^" + wc + "$"); err == nil {

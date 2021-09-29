@@ -15,18 +15,17 @@ func readFile(fname string, v interface{}) error {
 	return yaml.Unmarshal(buf, v)
 }
 
-type yamlInventory struct {
-	All struct {
-		Hosts map[string]struct {
-			Host    string `yaml:"ansible_host"`
-			User    string `yaml:"ansible_user"`
-			SSHPort string `yaml:"ansible_ssh_port"`
-			SSHHost string `yaml:"ansible_ssh_host"`
-		} `yaml:"hosts"`
-		Vars struct {
-			User string `yaml:"ansible_user"`
-		} `yaml:"vars"`
-	} ` yaml:"all"`
+type yamlInventory map[string]struct {
+	Hosts map[string]struct {
+		Host    string `yaml:"ansible_host"`
+		User    string `yaml:"ansible_user"`
+		SSHPort string `yaml:"ansible_ssh_port"`
+		SSHHost string `yaml:"ansible_ssh_host"`
+	} `yaml:"hosts"`
+	Children map[string]struct{} `yaml:"children"`
+	Vars     struct {
+		User string `yaml:"ansible_user"`
+	} `yaml:"vars"`
 }
 
 func parseInventoryYaml(fname string) (inv Inventory, err error) {
@@ -34,13 +33,33 @@ func parseInventoryYaml(fname string) (inv Inventory, err error) {
 	if err = readFile(fname, &req); err != nil {
 		return Inventory{}, err
 	}
-	for name, host := range req.All.Hosts {
-		h := Target{
-			Name: name,
-			User: picks(host.User, req.All.Vars.User),
-			Host: picks(host.SSHHost, host.Host, name),
-			Port: host.SSHPort,
+	inv.Groups = map[string][]string{}
+	addToGroup := func(g, h string) {
+		for _, v := range inv.Groups[g] {
+			if v == h {
+				return
+			}
 		}
+		inv.Groups[g] = append(inv.Groups[g], h)
+	}
+	fallbackUser := req["all"].Vars.User
+	hosts := map[string]Target{}
+
+	for group, g := range req {
+		for name, host := range g.Hosts {
+			addToGroup(group, name)
+			h := hosts[name]
+			h.Name = picks(h.Name, name)
+			h.User = picks(h.User, host.User, g.Vars.User, fallbackUser)
+			h.Host = picks(h.Host, host.SSHHost, host.Host)
+			h.Port = picks(h.Port, host.SSHPort)
+			hosts[name] = h
+		}
+		//for name, _ := range g.Children {
+		// XXX: this makes `name` a subgroup of the current group
+		//}
+	}
+	for _, h := range hosts {
 		inv.Targets = append(inv.Targets, h)
 	}
 	return
