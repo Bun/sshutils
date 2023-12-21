@@ -13,4 +13,4 @@ deb:
 	cp debian/control build/DEBIAN/control
 	go build -v -o build/usr/bin/pssh ./cmd/pssh
 	go build -v -o build/usr/bin/prun ./cmd/prun
-	fakeroot dpkg-deb -z2 --build build/ sshutils-0.2.deb
+	fakeroot dpkg-deb -z2 --build build/ sshutils-0.2.1.deb
